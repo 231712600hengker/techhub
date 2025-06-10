@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -42,6 +43,7 @@ const formSchema = z.object({
 })
 
 export default function RegisterPage() {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -54,12 +56,31 @@ export default function RegisterPage() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    setTimeout(() => {
-      toast.info("Registration is not functional in this demo")
+
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success("Registration successful! Please login with your new account.")
+        router.push("/login")
+      } else {
+        toast.error(data.error || "Registration failed")
+      }
+    } catch (error) {
+      toast.error("An error occurred during registration")
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   return (
