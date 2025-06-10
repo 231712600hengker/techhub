@@ -5,50 +5,77 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { productId, buyerName, date } = body;
+    const { name, price, stock, image, description } = body;
 
-    // Validasi sederhana
-    if (!productId || !buyerName) {
+    // Validation
+    if (!name || !price || !stock || !image || !description) {
       return NextResponse.json(
-        { error: "Product ID and buyer name are required" },
+        { error: "All fields are required" },
         { status: 400 }
       );
     }
 
-    // Cek apakah produk ada
-    const product = await prisma.product.findUnique({
-      where: { id: parseInt(productId) },
-    });
-
-    if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    // Buat transaksi
-    const transaction = await prisma.transaction.create({
+    // Create product
+    const product = await prisma.product.create({
       data: {
-        productId: parseInt(productId),
-        buyerName,
-        date: date ? new Date(date) : new Date(),
-        totalPrice: product.price, // harga diambil dari produk
+        name,
+        price: parseFloat(price),
+        stock: parseInt(stock),
+        image,
+        description,
       },
     });
 
-    return NextResponse.json(transaction, { status: 201 });
+    return NextResponse.json(product, { status: 201 });
   } catch (error) {
-    console.error("Error creating transaction:", error);
+    console.error("Error creating product:", error);
     return NextResponse.json(
-      { error: "Failed to create transaction" },
+      { error: "Failed to create product" },
       { status: 500 }
     );
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const search = searchParams.get('search') || '';
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '10');
+  const skip = (page - 1) * limit;
+
   try {
-    const products = await prisma.product.findMany()
-    return NextResponse.json(products) // <-- array langsung
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: {
+          name: {
+            contains: search,
+            mode: 'insensitive'
+          }
+        },
+        orderBy: {
+          id: 'asc'
+        },
+        skip,
+        take: limit,
+      }),
+      prisma.product.count({
+        where: {
+          name: {
+            contains: search,
+            mode: 'insensitive'
+          }
+        }
+      })
+    ]);
+    
+    return NextResponse.json({
+      items: products,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 })
+    console.error('Error fetching products:', error);
+    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
   }
 }

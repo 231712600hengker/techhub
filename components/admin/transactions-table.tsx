@@ -2,12 +2,25 @@
 
 import { useState } from "react"
 import { format } from "date-fns"
+import { Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/ui/data-table"
 import { Pagination } from "@/components/ui/pagination"
 import { formatCurrency } from "@/lib/utils"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export async function TransactionsTable() {
   const response = await fetch('/api/transactions?page=1&limit=10')
@@ -46,6 +59,28 @@ function TransactionsDataTable({ initialData }: TransactionsDataTableProps) {
     setCurrentPage(page)
   }
 
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await fetch(`/api/transactions/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Refresh the current page
+        const response = await fetch(`/api/transactions?search=${searchTerm}&page=${currentPage}&limit=10`)
+        const data = await response.json()
+        setData(data.items)
+        setTotalPages(data.totalPages)
+        
+        toast.success("Transaction deleted successfully")
+      } else {
+        toast.error("Failed to delete transaction")
+      }
+    } catch (error) {
+      toast.error("An error occurred while deleting the transaction")
+    }
+  }
+
   const columns = [
     {
       accessorKey: "id",
@@ -68,6 +103,36 @@ function TransactionsDataTable({ initialData }: TransactionsDataTableProps) {
       accessorKey: "totalPrice",
       header: "Amount",
       cell: ({ row }: any) => formatCurrency(row.original.totalPrice),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }: any) => (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this transaction? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleDelete(row.original.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ),
     },
   ]
 
