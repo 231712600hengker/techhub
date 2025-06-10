@@ -54,21 +54,27 @@ export default function AddTransactionPage() {
     defaultValues: {
       productId: "",
       buyerName: "",
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString().split("T")[0],
     },
   })
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch('/api/products')
+        const response = await fetch("/api/products")
         if (response.ok) {
           const data = await response.json()
-          setProducts(data)
+          console.log("Fetched products:", data)
+          if (Array.isArray(data)) {
+            setProducts(data)
+          } else {
+            throw new Error("Invalid data format")
+          }
         } else {
           toast.error("Failed to fetch products")
         }
       } catch (error) {
+        console.error(error)
         toast.error("An error occurred while fetching products")
       }
     }
@@ -105,11 +111,14 @@ export default function AddTransactionPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Link href="/admin/transactions" className="mb-6 inline-flex items-center text-sm font-medium">
+      <Link
+        href="/admin/transactions"
+        className="mb-6 inline-flex items-center text-sm font-medium"
+      >
         <ArrowLeft className="mr-2 h-4 w-4" />
         Back to Transactions
       </Link>
-      
+
       <Card className="mx-auto max-w-2xl">
         <CardHeader>
           <CardTitle>Add New Transaction</CardTitle>
@@ -126,25 +135,38 @@ export default function AddTransactionPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Product</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a product" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id.toString()}>
-                            {product.name} - ${product.price.toFixed(2)}
-                          </SelectItem>
-                        ))}
+                        {products.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">
+                            No products available
+                          </div>
+                        ) : (
+                          products.map((product) => (
+                            <SelectItem
+                              key={product.id}
+                              value={product.id.toString()}
+                            >
+                              {product.name} - $
+                              {(product.price ?? 0).toFixed(2)}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="buyerName"
@@ -158,7 +180,7 @@ export default function AddTransactionPage() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="date"
@@ -172,9 +194,13 @@ export default function AddTransactionPage() {
                   </FormItem>
                 )}
               />
-              
+
               <div className="flex justify-end space-x-4">
-                <Button variant="outline" type="button" onClick={() => router.push("/admin/transactions")}>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => router.push("/admin/transactions")}
+                >
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isLoading}>

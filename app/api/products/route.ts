@@ -1,67 +1,54 @@
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
-
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const search = searchParams.get('search') || '';
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '12');
-  const skip = (page - 1) * limit;
-
-  try {
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where: {
-          name: {
-            contains: search,
-            mode: 'insensitive'
-          }
-        },
-        orderBy: {
-          id: 'asc'
-        },
-        skip,
-        take: limit,
-      }),
-      prisma.product.count({
-        where: {
-          name: {
-            contains: search,
-            mode: 'insensitive'
-          }
-        }
-      })
-    ]);
-    
-    return NextResponse.json({
-      items: products,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit)
-    });
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
-  }
-}
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
-    const product = await prisma.product.create({
-      data: {
-        name: body.name,
-        price: parseFloat(body.price),
-        stock: parseInt(body.stock),
-        image: body.image,
-        description: body.description
-      }
+
+    const { productId, buyerName, date } = body;
+
+    // Validasi sederhana
+    if (!productId || !buyerName) {
+      return NextResponse.json(
+        { error: "Product ID and buyer name are required" },
+        { status: 400 }
+      );
+    }
+
+    // Cek apakah produk ada
+    const product = await prisma.product.findUnique({
+      where: { id: parseInt(productId) },
     });
-    
-    return NextResponse.json(product, { status: 201 });
+
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Buat transaksi
+    const transaction = await prisma.transaction.create({
+      data: {
+        productId: parseInt(productId),
+        buyerName,
+        date: date ? new Date(date) : new Date(),
+        totalPrice: product.price, // harga diambil dari produk
+      },
+    });
+
+    return NextResponse.json(transaction, { status: 201 });
   } catch (error) {
-    console.error('Error creating product:', error);
-    return NextResponse.json({ error: 'Failed to create product' }, { status: 500 });
+    console.error("Error creating transaction:", error);
+    return NextResponse.json(
+      { error: "Failed to create transaction" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    const products = await prisma.product.findMany()
+    return NextResponse.json(products) // <-- array langsung
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 })
   }
 }
